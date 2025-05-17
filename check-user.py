@@ -1,66 +1,54 @@
-import os
-import discord
+import nextcord
+from nextcord.ext import commands
 import requests
-import asyncio
 
-# === CONFIGURATION ===
-TOKEN = os.getenv('DISCORD_BOT_TOKEN')  # Replace with your bot's token
-CHANNEL_ID = 1373295378195284040   # Replace with your Discord channel ID
-USER_ID = 3753642683              # The Roblox user ID to monitor
-CHECK_INTERVAL = 30               # How often to check (in seconds)
+intents = nextcord.Intents.default()
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-intents = discord.Intents.default()
-intents.message_content = True
-
-client = discord.Client(intents=intents)
-last_status = None  # Keep track of the last presence status
+def get_roblox_user_id(username):
+    url = f"https://api.roblox.com/users/get-by-username?username={username}"
+    res = requests.get(url).json()
+    return res.get("Id", None)
 
 def get_presence(user_id):
     url = "https://presence.roblox.com/v1/presence/users"
-    headers = {"Content-Type": "application/json"}
-    body = {"userIds": [user_id]}
-    response = requests.post(url, json=body, headers=headers)
-    return response.json()["userPresences"][0]
+    response = requests.post(url, json={"userIds": [user_id]})
+    if response.status_code != 200:
+        return None
+    data = response.json()
+    if not data["userPresences"]:
+        return None
+    return data["userPresences"][0]
 
-def format_status(presence_type):
-    return ["Offline", "Online", "In Game", "In Studio"][presence_type]
+@bot.slash_command(name="check", description="Check Roblox user's online status")
+async def check(interaction: nextcord.Interaction, user: str):
+    """User param can be Roblox username or user ID"""
+    await interaction.response.defer()  # Acknowledge command immediately
 
-@client.event
-async def on_ready():
-    print(f"✅ Logged in as {client.user}")
-    channel = client.get_channel(CHANNEL_ID)
+    # Determine if input is user ID (digits) or username (letters)
+    if user.isdigit():
+        user_id = int(user)
+    else:
+        user_id = get_roblox_user_id(user)
+        if user_id is None:
+            await interaction.followup.send(f"❌ User `{user}` not found on Roblox.")
+            return
 
-    global last_status
+    presence = get_presence(user_id)
+    if presence is None:
+        await interaction.followup.send(f"❌ Could not get presence info for user ID {user_id}.")
+        return
 
-    while True:
-        try:
-            presence = get_presence(USER_ID)
-            current_status = presence["userPresenceType"]
+    status_types = ["Offline", "Online", "In Game", "In Studio"]
+    status = presence.get("userPresenceType", 0)
+    last_location = presence.get("lastLocation", "N/A")
+    place_id = presence.get("placeId", None)
+    game_link = f"https://www.roblox.com/games/{place_id}" if place_id else "N/A"
 
-            # Only respond if the user's status changed
-            if current_status != last_status:
-                last_status = current_status
+    msg = f"**Roblox User ID:** {user_id}\n**Status:** {status_types[status]}\n"
+    if status == 2:  # In Game
+        msg += f"**Playing:** {last_location}\n**Game Link:** {game_link}"
 
-                if current_status == 2:  # In Game
-                    game_name = presence.get("lastLocation", "a game")
-                    place_id = presence.get("placeId")
-                    game_link = f"https://www.roblox.com/games/{place_id}" if place_id else "Game link unavailable"
-                    await channel.send(
-                        f"🎮 **User is now in-game!**\nGame: `{game_name}`\n🔗 {game_link}"
-                    )
+    await interaction.followup.send(msg)
 
-                elif current_status == 1:  # Online (not in a game)
-                    await channel.send(f"🟢 **Phoenix is now online (not in a game).**")
-
-                elif current_status == 0:  # Offline
-                    await channel.send(f"🔴 **Phoenix went offline.**")
-
-                elif current_status == 3:  # In Studio
-                    await channel.send(f"🛠️ **Phoenix is working in Roblox Studio.**")
-
-        except Exception as e:
-            print(f"❌ Error: {e}")
-
-        await asyncio.sleep(CHECK_INTERVAL)
-
-client.run(TOKEN)
+bot.run("YOUR_DISCORD_BOT_TOKEN")
