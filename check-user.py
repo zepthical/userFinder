@@ -51,4 +51,6 @@ async def check(interaction: nextcord.Interaction, user: str):
 
     await interaction.followup.send(msg)
 
-bot.run("YOUR_DISCORD_BOT_TOKEN")
+token = os.getenv('DISCORD_BOT_TOKEN')
+
+bot.run(token)
