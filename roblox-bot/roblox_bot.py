@@ -6,13 +6,15 @@ import requests
 TOKEN = os.getenv('DISCORD_BOT_TOKEN')
 
 intents = nextcord.Intents.default()
-intents.message_content = True  # ✅ Enable this to fix the warning
+intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 def get_roblox_user_id(username):
-    url = f"https://api.roblox.com/users/get-by-username?username={username}"
+    url = f"https://users.roblox.com/v1/users/search?keyword={username}"
     res = requests.get(url).json()
-    return res.get("Id", None)
+    if "data" in res and len(res["data"]) > 0:
+        return res["data"][0]["id"]
+    return None
 
 def get_presence(user_id):
     url = "https://presence.roblox.com/v1/presence/users"
