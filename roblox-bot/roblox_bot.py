@@ -6,6 +6,7 @@ import requests
 TOKEN = os.getenv('DISCORD_BOT_TOKEN')
 
 intents = nextcord.Intents.default()
+intents.message_content = True  # ✅ Enable this to fix the warning
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 def get_roblox_user_id(username):
@@ -57,9 +58,9 @@ async def check(interaction: nextcord.Interaction, user: str):
 async def on_ready():
     print(f"Logged in as {bot.user}")
     try:
-        synced = await bot.sync_application_commands()
-        print(f"Synced {len(synced)} commands")
+        await bot.sync_application_commands()
+        print("✅ Slash commands synced")
     except Exception as e:
-        print(f"Failed to sync commands: {e}")
+        print(f"❌ Failed to sync commands: {e}")
 
 bot.run(TOKEN)
