@@ -3,6 +3,8 @@ import os
 from nextcord.ext import commands
 import requests
 
+TOKEN = os.getenv('DISCORD_BOT_TOKEN')
+
 intents = nextcord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
