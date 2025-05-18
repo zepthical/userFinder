@@ -1,4 +1,5 @@
 import nextcord
+import os
 from nextcord.ext import commands
 import requests
 
@@ -22,35 +23,32 @@ def get_presence(user_id):
 
 @bot.slash_command(name="check", description="Check Roblox user's online status")
 async def check(interaction: nextcord.Interaction, user: str):
-    """User param can be Roblox username or user ID"""
-    await interaction.response.defer()  # Acknowledge command immediately
-
-    # Determine if input is user ID (digits) or username (letters)
+    await interaction.response.defer()
     if user.isdigit():
         user_id = int(user)
     else:
         user_id = get_roblox_user_id(user)
         if user_id is None:
-            await interaction.followup.send(f"❌ User `{user}` not found on Roblox.")
+            await interaction.followup.send(f"❌ Roblox user `{user}` not found.")
             return
 
     presence = get_presence(user_id)
-    if presence is None:
-        await interaction.followup.send(f"❌ Could not get presence info for user ID {user_id}.")
+    if not presence:
+        await interaction.followup.send("❌ Unable to fetch presence data.")
         return
 
-    status_types = ["Offline", "Online", "In Game", "In Studio"]
-    status = presence.get("userPresenceType", 0)
+    status_map = ["Offline", "Online", "In Game", "In Studio"]
+    status = presence["userPresenceType"]
+    place_id = presence.get("placeId")
     last_location = presence.get("lastLocation", "N/A")
-    place_id = presence.get("placeId", None)
-    game_link = f"https://www.roblox.com/games/{place_id}" if place_id else "N/A"
 
-    msg = f"**Roblox User ID:** {user_id}\n**Status:** {status_types[status]}\n"
-    if status == 2:  # In Game
-        msg += f"**Playing:** {last_location}\n**Game Link:** {game_link}"
+    msg = f"👤 **Roblox User ID:** {user_id}\n"
+    msg += f"📶 **Status:** {status_map[status]}\n"
+
+    if status == 2 and place_id:
+        msg += f"🎮 **Game:** {last_location}\n"
+        msg += f"🔗 [Join Game](https://www.roblox.com/games/{place_id})"
 
     await interaction.followup.send(msg)
 
-token = os.getenv('DISCORD_BOT_TOKEN')
-
-bot.run(token)
+bot.run(TOKEN)
